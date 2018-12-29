@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter import Frame
-from time import sleep
 import random
 
+# Python 3.7 reccomended. Found some issues in 3.6 for unknown reason
 
 class BaseProgram(tk.Tk):    # Our root window, that the program will run in
-    def __init__(self) :    # This whole class is actually currently unessacary until I add menus and stuff ...
+    def __init__(self) :   
+
         tk.Tk.__init__(self)
 
         self.wm_title("SimonSays")       # Sets the Title of our window
@@ -21,30 +22,30 @@ class BaseProgram(tk.Tk):    # Our root window, that the program will run in
         self.pages = {} # a dic of all the pages in our program
 
         #TODO: Add Settings Page
-        #TODO: Possibly add a "You Lost" page
         #TODO: Statistics Page?
 
-        for page in (SimonSays,MainMenu,Lost,) : # must add new menus here...
+        self.Frames = (SimonSays,MainMenu,Lost,)
+
+        for page in  self.Frames : # must add new menus here...
             vpage = page(FrameMan,self)    # Calls and creates the page
 
-            self.pages[page] = vpage        # Stores that page in the dict so it can be referenced again
+            self.pages[page] = vpage        # Stores an instance of that page in the dict so it can be referenced again
 
             vpage.grid(row=0,column=0,sticky="nsew")  
-
-        #self.Show_Page(MainMenu,)  # Starts the Game
 
         self.Show_Page(MainMenu)
 
     def Show_Page(self,page) : #We can change the page with this, just pass in name of Page
         shown = self.pages[page]
-        shown.tkraise()   # Makes the frame show on TOP of the stack. Other windows are actually still there behind it
-        if isinstance(shown,SimonSays) :
-            shown.master.after(2000,shown.playgame)
-        elif isinstance(shown,Lost) :
-            var = "Highscore : "+str(self.Highscore)
-            shown.Hs["text"] = var
-            var = "Score : "+str(self.Score)
-            shown.Ls["text"] = var
+        
+        try :
+            shown.showtime() # func that will be called if page is going to be shown
+                             # I thought it was a clever name...
+        except :
+            pass
+
+        shown.tkraise()   # Makes the frame show on TOP of the stack. Other pages of the program are actually still there behind it
+        
 
 
 class SimonSays(Frame) :
@@ -56,10 +57,8 @@ class SimonSays(Frame) :
     def __init__(self,FrameManager,Program) :
 
         Frame.__init__(self,FrameManager) # Creates our Frame or "screen"  which will be managed by FrameManager
-        
-        self.Program = Program
-        self.Program.Highscore = 0
 
+        self.Program = Program
         self.grid_rowconfigure(0,weight=1)       # Configure all the rows and columns
         self.grid_rowconfigure(1,weight=2)      # Inner rows have a bigger weight so they displace the outer spacer rows
         self.grid_rowconfigure(2,weight=2)
@@ -88,7 +87,6 @@ class SimonSays(Frame) :
 
         # the label self.Display will show which button has been pressed last
 
-        #TODO: Automate display changing
 
         self.Display = tk.Label(self,bg="white", text="",relief="ridge",borderwidth=4,height=3,width=3)
         self.Display.grid(row=0,column=2,sticky="nsew",padx=20,pady=20)
@@ -116,6 +114,18 @@ class SimonSays(Frame) :
 
 
         #self.master.after(2000,self.playgame) # Gives us a short time to make sure window is loaded/ player is paying attention
+
+    def changeDisplay(self,button=0) :
+
+        if isinstance(button,tk.Button) :
+            self.Display["text"] = button["text"]
+            self.Display["bg"] = button["bg"]
+        else :
+            self.Display["text"] = ""
+            self.Display["bg"] = "white"
+
+    def showtime(self) :
+        self.master.after(2000,self.playgame)
 
     def playgame(self) :
         self.score = 0
@@ -149,8 +159,8 @@ class SimonSays(Frame) :
 
     def flashbutton(self,buttonpressed) :  # Makes the button flash itself by changing color to white than changing back
         color = buttonpressed["bg"] #store button color
-        self.Display["text"] = buttonpressed["text"] 
-        self.Display["bg"] = color   # makes display show the button was pressed
+        
+        self.changeDisplay(buttonpressed)
         
         buttonpressed.config(bg="white") # Turn button white
 
@@ -174,15 +184,16 @@ class SimonSays(Frame) :
         self.playerpressed.append(button)
         # Add the button to list of buttons the player pressed
 
-        self.Display["text"] = button["text"]  # make display show this button was pressed
-        self.Display["bg"] = button["bg"]
+        self.changeDisplay(button)
 
         if self.simonsaid[:len(self.playerpressed)] == self.playerpressed : #if player's pressed buttons so far matches what simon wants
             if len(self.simonsaid) == len(self.playerpressed) :  # pass unless player has pressed every button
                                                                  # if they have.
                 self.Label["text"] = "Correct. Changing Turn..."  # Tell them they are right and turn is changing
+        
                 for b in self.buttons :                           # disable all the buttons
                     b["state"] = "disabled"
+        
                 self.score += 1
 
                 self.master.after(1500,self.Computerturn)         # after a bit go back to computer's turn
@@ -191,19 +202,15 @@ class SimonSays(Frame) :
             self.lost() #they lost
 
     def lost(self) : # when a player loses
-        #self.Label["text"] = "You Lost!"  #show they lost on label
         for button in self.buttons :     # disable all the buttons
             button["state"] = "disabled"
+      
         self.Label["text"] = "Starting Game..."
-        self.Display["bg"] = "white"
-        self.Display["text"] = ""
-        self.Program.Score = self.score
-        if self.score > self.Program.Highscore :
-            self.Program.Highscore = self.score
+      
+        self.changeDisplay()
 
         self.Program.Show_Page(Lost)
 
-        #TODO : add ability to retry
 
 
 class MainMenu(Frame) :
@@ -228,6 +235,8 @@ class Lost(Frame) :
 
         Frame.__init__(self,FrameManager) # Creates our Frame or "screen"  which will be managed by FrameManager
 
+        self. updatedHS = False
+
         self.Program = Program
         
         self.Title = tk.Label(self,text="You Lost!",height=2,font=("", 44))
@@ -241,6 +250,36 @@ class Lost(Frame) :
 
         self.PlayAgain = tk.Button(self, text="Play Again",bg="green",borderwidth=2,height=3,width=10,command=self.playagain)
         self.PlayAgain.pack()
+
+    def showtime(self) :
+        self.Score = str(self.Program.pages[SimonSays].score)
+        self.Ls["text"] = "Score : " + self.Score
+        self.Hs["text"] = "Highscore : " + self.updateHS()
+
+
+    def updateHS(self) :
+        try :
+            fh = self.filehiscore()
+            if int(self.Score) > int(fh) :
+                self.updatefileHS()
+                return self.Score
+            return fh 
+        except: 
+            self.updatefileHS()
+            print("wrote a new file for hs")
+            return self.Score
+
+        
+    def updatefileHS(self) :
+        f = open("score.txt","w")
+        f.write(self.Score)
+        f.close()    
+
+    def filehiscore(self) :
+        f = open("score.txt","r")
+        hs = f.readline()
+        f.close()    
+        return hs 
 
     def playagain(self) :
         self.Program.Show_Page(SimonSays)
